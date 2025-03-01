@@ -1,0 +1,18 @@
+# preprocessing
+pandas
+openai
+scipy
+tqdm
+datasets
+jellyfish
+nltk
+numpy
+jupyterlab
+
+# training
+#torch
+#transformers[torch]
+#scikit-learn
+#wandb
+#evaluate
+#seqeval
