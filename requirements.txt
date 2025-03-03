@@ -8,6 +8,8 @@ jellyfish
 nltk
 numpy
 jupyterlab
+matplotlib
+seaborn
 
 # training
 #torch
