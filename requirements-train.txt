@@ -1,0 +1,9 @@
+# training
+torch
+transformers[torch]
+scikit-learn
+wandb
+evaluate
+seqeval
+
+-r requirements.txt
