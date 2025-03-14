@@ -10,6 +10,7 @@ numpy
 jupyterlab
 matplotlib
 seaborn
+python-dotenv
 
 # training
 #torch
