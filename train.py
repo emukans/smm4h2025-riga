@@ -1,14 +1,12 @@
-from random import shuffle, seed
+from random import seed
 
-import torch
 import wandb
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, EarlyStoppingCallback
 
 import os
 
 import numpy as np
 
-from datasets import Dataset
+from datasets import DatasetDict
 import evaluate
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer
 from transformers import DataCollatorWithPadding
@@ -65,46 +63,26 @@ def compute_metrics(eval_pred):
     return accuracy.compute(predictions=predictions, references=labels)
 
 
-with open(os.path.join(train_dataset_dir, dataset_type, 'positive.csv')) as f:
-    train_positive_list = f.readlines()
-
-
-with open(os.path.join(train_dataset_dir, dataset_type, 'negative.csv')) as f:
-    train_negative_list = f.readlines()
-
-
-shuffle(train_negative_list)
-train_negative_list = train_negative_list[:round(len(train_negative_list) * downsample_size)]
-
-with open(os.path.join(dev_dataset_dir, dataset_type, 'positive.csv')) as f:
-    dev_positive_list = f.readlines()
-
-
-with open(os.path.join(dev_dataset_dir, dataset_type, 'negative.csv')) as f:
-    dev_negative_list = f.readlines()
-
-
 wandb.init()
+
+ds_path = 'data/task1/plain_ds'
+dataset = DatasetDict.load_from_disk(ds_path)
+test_df = dataset['test'].to_pandas()
+
 wandb.log({
-    'train_size': len(train_positive_list + train_negative_list),
-    'dev_size': len(dev_positive_list + dev_negative_list),
-    'downsample_size': downsample_size,
-    'train_positive_proportion': len(train_positive_list) / len(train_positive_list + train_negative_list),
-    'dev_positive_proportion': len(dev_positive_list) / len(dev_positive_list + dev_negative_list),
+    'train_size': len(dataset['train']),
+    'dev_size': len(dataset['dev']),
+    'test_size': len(dataset['test']),
     'model_size': model.num_parameters(),
     'max_len': MAX_LEN,
 })
-
-train_dataset = Dataset.from_dict({'text': train_positive_list + train_negative_list, 'label': [1] * len(train_positive_list) + [0] * len(train_negative_list)})
-dev_dataset = Dataset.from_dict({'text': dev_positive_list + dev_negative_list, 'label': [1] * len(dev_positive_list) + [0] * len(dev_negative_list)})
 
 
 def preprocess_function(examples):
     return tokenizer([s.lower() for s in examples["text"]], max_length=MAX_LEN, truncation=True, padding='max_length')
 
 
-train_dataset = train_dataset.map(preprocess_function, batched=True)
-dev_dataset = dev_dataset.map(preprocess_function, batched=True)
+dataset = dataset.map(preprocess_function, batched=True)
 
 
 training_args = TrainingArguments(
@@ -124,8 +102,8 @@ training_args = TrainingArguments(
 trainer = Trainer(
     model=model,
     args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=dev_dataset,
+    train_dataset=dataset['train'],
+    eval_dataset=dataset['dev'],
     tokenizer=tokenizer,
     data_collator=data_collator,
     compute_metrics=compute_metrics,
@@ -137,12 +115,21 @@ trainer.evaluate()
 trainer.save_model("model/" + os.environ["WANDB_NAME"])
 
 
-# tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
-# model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
-#
-# inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
-# with torch.no_grad():
-#     logits = model(**inputs).logits
-#
-# predicted_class_id = logits.argmax().item()
-# model.config.id2label[predicted_class_id]
+predictions = trainer.predict(dataset['test'])
+test_df['prediction'] = np.argmax(predictions.predictions, axis=1)
+
+
+def stratified_predictions(df, category):
+    result = dict()
+    for lang in df[category].unique():
+        df_to_test = df[df[category] == lang]
+
+        r = accuracy.compute(predictions=df_to_test['predictions'], references=df_to_test['label'])
+        for k, v in r.items():
+            result[category + '_' + k] = v
+
+    return result
+
+
+wandb.log(stratified_predictions(test_df, 'language'))
+wandb.log(stratified_predictions(test_df, 'type'))
