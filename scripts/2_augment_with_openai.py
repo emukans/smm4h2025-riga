@@ -23,7 +23,13 @@ Text to process:
 {text}
 """
 
-drug_mining = """Extract a list of drugs that a mentioned in the text. Provide up to 3 sentences of description for every drug found. In the description mention the type and class of the drug, the purpose of the drug (used to diagnose, cure, treat, or prevent disease), whether is it a prescription or over-the-counter drug, and any other relevant information. If no drug in the text, then output null. The output should be provided as a list where each drug is on a new line. Every line starts with a bullet point *
+drug_mining = """Extract a list of drugs that a mentioned in the text. If there are multiple options for a valid drug name, then provide them in brackets as comma-separated. If no drug in the text, then output null. The output should be provided as a list where each drug is on a new line. Every line starts with a bullet point *
+
+Text to process:
+{text}
+"""
+
+drug_description_mining = """Extract a list of drugs that a mentioned in the text. Provide up to 3 sentences of description for every drug found. In the description mention the type and class of the drug, the purpose of the drug (used to diagnose, cure, treat, or prevent disease), whether is it a prescription or over-the-counter drug, and any other relevant information. If no drug in the text, then output null. The output should be provided as a list where each drug is on a new line. Every line starts with a bullet point *
 
 Text to process:
 {text}
@@ -32,8 +38,6 @@ Text to process:
 
 if __name__ == '__main__':
     source_path = '../data/task1/stratified'
-    # span_from = int(sys.argv[1])
-    # span_to = int(sys.argv[2])
 
     # task_type = 'translation'
     # task_type = 'translate_summarize'
@@ -68,7 +72,7 @@ if __name__ == '__main__':
                                    "content": drug_mining.format(text=text)
                                }
                            ],
-                           "max_tokens": 1024,
+                           "max_tokens": 128,
                            "temperature": 0,
                            "top_p": 1,
                            "frequency_penalty": 0,
@@ -88,7 +92,7 @@ if __name__ == '__main__':
         endpoint="/v1/chat/completions",
         completion_window="24h",
         metadata={
-            "description": "Text translation and summarization"
+            "description": "Drug mining"
         }
     )
 
