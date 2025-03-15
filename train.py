@@ -35,14 +35,12 @@ checkpoint = "distilbert/distilbert-base-uncased"
 # checkpoint = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
 # checkpoint = "papluca/xlm-roberta-base-language-detection"
 
-train_dataset_dir = 'data/task1/train'
-dev_dataset_dir = 'data/task1/dev'
-dataset_type = 'plain'
+dataset_type = 'plain_ds_preprocessed'
 
 os.environ["WANDB_PROJECT"] = "smm4h2025-task1-classification"
 os.environ["WANDB_LOG_MODEL"] = "false"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-1"
+os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-2"
 # os.environ["WANDB_NOTES"] = "Spans extracted by GPT3.5 from tweets, classification. Downample 0.2"
 
 
@@ -67,7 +65,7 @@ def compute_metrics(eval_pred):
 
 wandb.init()
 
-ds_path = 'data/task1/plain_ds'
+ds_path = f'data/task1/{dataset_type}'
 dataset = DatasetDict.load_from_disk(ds_path)
 dev_df = dataset['dev'].to_pandas()
 test_df = dataset['test'].to_pandas()
