@@ -23,6 +23,12 @@ Text to process:
 {text}
 """
 
+drug_mining = """Extract a list of drugs that a mentioned in the text. Provide up to 3 sentences of description for every drug found. In the description mention the type and class of the drug, the purpose of the drug (used to diagnose, cure, treat, or prevent disease), whether is it a prescription or over-the-counter drug, and any other relevant information. If no drug in the text, then output null. The output should be provided as a list where each drug is on a new line. Every line starts with a bullet point *
+
+Text to process:
+{text}
+"""
+
 
 if __name__ == '__main__':
     source_path = '../data/task1/stratified'
@@ -30,17 +36,18 @@ if __name__ == '__main__':
     # span_to = int(sys.argv[2])
 
     # task_type = 'translation'
-    task_type = 'translate_summarize'
+    # task_type = 'translate_summarize'
+    task_type = 'drug_mining'
     dataset_path = os.path.join(source_path, task_type)
     os.makedirs(dataset_path, exist_ok=True)
     full_json = {}
     split_list = ['dev', 'train']
-    # stratification_type_list = ['de', 'fr', 'ru']
-    stratification_type_list = ['forum post', 'review']
+    stratification_type_list = ['de', 'fr', 'ru', 'en']
+    # stratification_type_list = ['forum post', 'review']
     for split in split_list:
         for stratify_by in stratification_type_list:
-            with open(os.path.join(source_path, f'{split}_type_{stratify_by}.json'), 'r') as f:
-            # with open(os.path.join(source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
+            # with open(os.path.join(source_path, f'{split}_type_{stratify_by}.json'), 'r') as f:
+            with open(os.path.join(source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
                 full_json.update(json.load(f))
 
     with open(os.path.join(dataset_path, 'source.json'), 'w') as f:
@@ -58,7 +65,7 @@ if __name__ == '__main__':
                            "messages": [
                                {
                                    "role": "user",
-                                   "content": translation_summarization_prompt.format(text=text)
+                                   "content": drug_mining.format(text=text)
                                }
                            ],
                            "max_tokens": 1024,
