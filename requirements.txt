@@ -11,6 +11,7 @@ jupyterlab
 matplotlib
 seaborn
 python-dotenv
+emoji
 
 # training
 #torch
