@@ -33,11 +33,11 @@ if __name__ == '__main__':
         if id_ in translate_summarize_map:
             continue
         train_df.loc[train_df['id'] == id_, 'text'] = content
-        test_df.loc[train_df['id'] == id_, 'text'] = content
+        test_df.loc[test_df['id'] == id_, 'text'] = content
 
     for id_, content in tqdm(translate_summarize_map.items()):
         train_df.loc[train_df['id'] == id_, 'text'] = content
-        test_df.loc[train_df['id'] == id_, 'text'] = content
+        test_df.loc[test_df['id'] == id_, 'text'] = content
 
     train_df, val_df = train_test_split(train_df, test_size=0.2)
 
