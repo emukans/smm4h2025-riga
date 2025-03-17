@@ -16,18 +16,18 @@ seed(42)
 np.random.seed(42)
 
 
-MAX_LEN = 200
-batch_size = 64
+MAX_LEN = 100
+batch_size = 32
 # epoch_count = 1
-epoch_count = 50
-learning_rate = 2e-5
+epoch_count = 30
+learning_rate = 5e-7
 downsample_size = 1
 
 
-checkpoint = "distilbert/distilbert-base-uncased"
+# checkpoint = "distilbert/distilbert-base-uncased"
 # checkpoint = "cardiffnlp/tweet-topic-21-multi"
 # checkpoint = "cardiffnlp/twitter-roberta-base-sentiment-latest"
-# checkpoint = "cardiffnlp/twitter-roberta-large-topic-sentiment-latest"
+checkpoint = "cardiffnlp/twitter-roberta-large-topic-sentiment-latest"
 # checkpoint = "cardiffnlp/twitter-roberta-large-hate-latest"
 # checkpoint = "microsoft/Multilingual-MiniLM-L12-H384"
 # checkpoint = "microsoft/deberta-v2-xxlarge-mnli"
@@ -35,12 +35,16 @@ checkpoint = "distilbert/distilbert-base-uncased"
 # checkpoint = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
 # checkpoint = "papluca/xlm-roberta-base-language-detection"
 
-dataset_type = 'plain_ds_preprocessed'
+# dataset_type = 'plain_ds'
+# dataset_type = 'ds_preprocessed'
+# dataset_type = 'ds_preprocessed_translation'
+# dataset_type = 'ds_preprocessed_translate_summarize'
+dataset_type = 'ds_preprocessed_translate_summarize_full'
 
 os.environ["WANDB_PROJECT"] = "smm4h2025-task1-classification"
 os.environ["WANDB_LOG_MODEL"] = "false"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-2"
+os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-3"
 # os.environ["WANDB_NOTES"] = "Spans extracted by GPT3.5 from tweets, classification. Downample 0.2"
 
 
@@ -67,8 +71,8 @@ wandb.init()
 
 ds_path = f'data/task1/{dataset_type}'
 dataset = DatasetDict.load_from_disk(ds_path)
-dev_df = dataset['dev'].to_pandas()
-test_df = dataset['test'].to_pandas()
+dev_df = dataset['dev'].to_pandas().copy()
+test_df = dataset['test'].to_pandas().copy()
 
 wandb.log({
     'train_size': len(dataset['train']),
@@ -80,7 +84,7 @@ wandb.log({
 
 
 def preprocess_function(examples):
-    return tokenizer([s.lower() for s in examples["text"]], max_length=MAX_LEN, truncation=True, padding='max_length')
+    return tokenizer([s for s in examples["text"]], max_length=MAX_LEN, truncation=True, padding='max_length')
 
 
 dataset = dataset.map(preprocess_function, batched=True)
@@ -116,11 +120,11 @@ trainer.evaluate()
 trainer.save_model("model/" + os.environ["WANDB_NAME"])
 
 
-predictions = trainer.predict(dataset['test'])
-test_df['prediction'] = np.argmax(predictions.predictions, axis=1)
+test_predictions = trainer.predict(dataset['test'])
+test_df['prediction'] = np.argmax(test_predictions.predictions, axis=1)
 
-predictions = trainer.predict(dataset['dev'])
-dev_df['prediction'] = np.argmax(predictions.predictions, axis=1)
+dev_predictions = trainer.predict(dataset['dev'])
+dev_df['prediction'] = np.argmax(dev_predictions.predictions, axis=1)
 
 
 def stratified_predictions(df, category, split):
