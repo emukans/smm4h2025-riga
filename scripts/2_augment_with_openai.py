@@ -39,19 +39,20 @@ Text to process:
 if __name__ == '__main__':
     source_path = '../data/task1/stratified'
 
-    # task_type = 'translation'
-    # task_type = 'translate_summarize'
-    task_type = 'drug_mining'
+    # task_type = 'translation2'
+    task_type = 'translate_summarize2'
+    # task_type = 'drug_mining2'
     dataset_path = os.path.join(source_path, task_type)
     os.makedirs(dataset_path, exist_ok=True)
     full_json = {}
     split_list = ['dev', 'train']
-    stratification_type_list = ['de', 'fr', 'ru', 'en']
-    # stratification_type_list = ['forum post', 'review']
+    # stratification_type_list = ['de', 'fr', 'ru']
+    # stratification_type_list = ['de', 'fr', 'ru', 'en']
+    stratification_type_list = ['forum post', 'review']
     for split in split_list:
         for stratify_by in stratification_type_list:
-            # with open(os.path.join(source_path, f'{split}_type_{stratify_by}.json'), 'r') as f:
-            with open(os.path.join(source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
+            with open(os.path.join(source_path, f'{split}_type_{stratify_by}.json'), 'r') as f:
+            # with open(os.path.join(source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
                 full_json.update(json.load(f))
 
     with open(os.path.join(dataset_path, 'source.json'), 'w') as f:
@@ -69,16 +70,17 @@ if __name__ == '__main__':
                            "messages": [
                                {
                                    "role": "user",
-                                   "content": drug_mining.format(text=text)
+                                   "content": translation_summarization_prompt.format(text=text)
                                }
                            ],
-                           "max_tokens": 128,
+                           "max_tokens": 1024,
                            "temperature": 0,
                            "top_p": 1,
                            "frequency_penalty": 0,
                            "presence_penalty": 0}}, f)
             f.write('\n')
 
+    # exit()
     client = openai.OpenAI()
 
     batch_input_file = client.files.create(
@@ -92,7 +94,7 @@ if __name__ == '__main__':
         endpoint="/v1/chat/completions",
         completion_window="24h",
         metadata={
-            "description": "Drug mining"
+            "description": "Text translation and summarization"
         }
     )
 

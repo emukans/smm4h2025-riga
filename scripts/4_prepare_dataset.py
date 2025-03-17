@@ -23,8 +23,8 @@ if __name__ == '__main__':
     test_df = pd.read_csv(os.path.join(data_dir, 'dev_preprocessed.csv'))
     train_df = pd.read_csv(os.path.join(data_dir, 'train_preprocessed.csv'))
 
-    # augmentation_type = 'translation'
-    augmentation_type = 'translate_summarize'
+    # augmentation_type = 'translation2'
+    augmentation_type = 'translate_summarize2'
 
     translate_map = build_map('translation')
     translate_summarize_map = build_map(augmentation_type)
@@ -39,7 +39,7 @@ if __name__ == '__main__':
         train_df.loc[train_df['id'] == id_, 'text'] = content
         test_df.loc[test_df['id'] == id_, 'text'] = content
 
-    train_df, val_df = train_test_split(train_df, test_size=0.2)
+    train_df, val_df = train_test_split(train_df, test_size=0.2, shuffle=True)
 
     dataset = DatasetDict({
         'train': Dataset.from_pandas(train_df, preserve_index=False),

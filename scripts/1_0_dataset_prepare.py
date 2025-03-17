@@ -22,10 +22,12 @@ def normalize_string(s):
     return s.strip()
 
 
-def build_tweet_dict(data_path):
+def preprocess_data(data_path, id_prefix):
     id_list = []
+    text_list = []
     file_path, ext = os.path.splitext(data_path)
     file_path += '_preprocessed' + ext
+    duplicate_count = 0
 
     with open(data_path, 'r') as fr, open(file_path, 'w') as fw:
         reader = csv.DictReader(fr)
@@ -37,17 +39,26 @@ def build_tweet_dict(data_path):
                 raise Exception(f"Duplicate tweet: {line['id']}")
 
             line['text'] = normalize_string(line['text'].strip().strip('"'))
+            line['id'] = id_prefix + '_' + line['id']
             if not line['text']:
                 print(f'Empty text: {line["id"]}')
                 continue
 
+            if line['text'] in text_list:
+                print('Duplicate text: ', line['id'], line['text'])
+                duplicate_count += 1
+                continue
+
             writer.writerow(line)
             id_list.append(line['id'])
+            text_list.append(line['text'])
+
+    print(f'Duplicate cound for {id_prefix}: {duplicate_count}')
 
 
 if __name__ == '__main__':
     train_tweets_data_path = '../data/task1/train.csv'
     dev_tweets_data_path = '../data/task1/dev.csv'
 
-    build_tweet_dict(train_tweets_data_path)
-    build_tweet_dict(dev_tweets_data_path)
+    preprocess_data(train_tweets_data_path, 'train')
+    preprocess_data(dev_tweets_data_path, 'dev')
