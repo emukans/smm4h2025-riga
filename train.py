@@ -19,8 +19,8 @@ np.random.seed(42)
 MAX_LEN = 100
 batch_size = 32
 # epoch_count = 1
-epoch_count = 30
-learning_rate = 5e-7
+epoch_count = 15
+learning_rate = 2e-5
 downsample_size = 1
 
 
@@ -44,7 +44,7 @@ dataset_type = 'ds_preprocessed_translate_summarize_full'
 os.environ["WANDB_PROJECT"] = "smm4h2025-task1-classification"
 os.environ["WANDB_LOG_MODEL"] = "false"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-3"
+os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-7"
 # os.environ["WANDB_NOTES"] = "Spans extracted by GPT3.5 from tweets, classification. Downample 0.2"
 
 
@@ -115,16 +115,7 @@ trainer = Trainer(
 )
 
 trainer.train()
-trainer.evaluate()
-
 trainer.save_model("model/" + os.environ["WANDB_NAME"])
-
-
-test_predictions = trainer.predict(dataset['test'])
-test_df['prediction'] = np.argmax(test_predictions.predictions, axis=1)
-
-dev_predictions = trainer.predict(dataset['dev'])
-dev_df['prediction'] = np.argmax(dev_predictions.predictions, axis=1)
 
 
 def stratified_predictions(df, category, split):
@@ -139,8 +130,17 @@ def stratified_predictions(df, category, split):
     return result
 
 
+dev_predictions = trainer.predict(dataset['dev'], metric_key_prefix='eval')
+dev_df['prediction'] = np.argmax(dev_predictions.predictions, axis=1)
+# dev_df.to_csv('data/task1/dev_result.csv', index=False)
+
 wandb.log(stratified_predictions(dev_df, 'language', 'eval'))
 wandb.log(stratified_predictions(dev_df, 'type', 'eval'))
+
+
+test_predictions = trainer.predict(dataset['test'], metric_key_prefix='test')
+test_df['prediction'] = np.argmax(test_predictions.predictions, axis=1)
+# test_df.to_csv('data/task1/test_result.csv', index=False)
 
 wandb.log(stratified_predictions(test_df, 'language', 'test'))
 wandb.log(stratified_predictions(test_df, 'type', 'test'))
