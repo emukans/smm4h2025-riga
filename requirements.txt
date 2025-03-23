@@ -12,6 +12,8 @@ matplotlib
 seaborn
 python-dotenv
 emoji
+aiohttp[speedups]
+beautifulsoup4
 
 # training
 #torch

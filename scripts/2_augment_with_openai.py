@@ -35,34 +35,52 @@ Text to process:
 {text}
 """
 
+ru_drug_name_translate = """Translate drug name to English. Output just the name.
+
+Text to process:
+{text}
+"""
+
+drug_name_mapping = """You are provided with a drug name. Provide a proper medical name or the name of the active element if you are provided with specific brand. Output just the name. If the name unknown output null. If there are multiple elements, then output them comma-separated
+
+Text to process:
+{text}
+"""
+
 
 if __name__ == '__main__':
-    source_path = '../data/task1/stratified'
+    # source_path = '../data/task1/stratified'
+    source_path = '../data/task1'
 
     # task_type = 'translation2'
-    task_type = 'translate_summarize2'
+    # task_type = 'translate_summarize2'
     # task_type = 'drug_mining2'
+    # task_type = 'ru_mapping_translate'
+    task_type = 'drug_mapping'
     dataset_path = os.path.join(source_path, task_type)
-    os.makedirs(dataset_path, exist_ok=True)
-    full_json = {}
-    split_list = ['dev', 'train']
-    # stratification_type_list = ['de', 'fr', 'ru']
-    # stratification_type_list = ['de', 'fr', 'ru', 'en']
-    stratification_type_list = ['forum post', 'review']
-    for split in split_list:
-        for stratify_by in stratification_type_list:
-            with open(os.path.join(source_path, f'{split}_type_{stratify_by}.json'), 'r') as f:
-            # with open(os.path.join(source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
-                full_json.update(json.load(f))
-
-    with open(os.path.join(dataset_path, 'source.json'), 'w') as f:
-        json.dump(full_json, f)
-
-    print(len(full_json))
+    # os.makedirs(dataset_path, exist_ok=True)
+    # full_json = {}
+    # split_list = ['dev', 'train']
+    # # stratification_type_list = ['de', 'fr', 'ru']
+    # # stratification_type_list = ['de', 'fr', 'ru', 'en']
+    # stratification_type_list = ['forum post', 'review']
+    # for split in split_list:
+    #     for stratify_by in stratification_type_list:
+    #         with open(os.path.join(source_path, f'{split}_type_{stratify_by}.json'), 'r') as f:
+    #         # with open(os.path.join(source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
+    #             full_json.update(json.load(f))
+    #
+    # with open(os.path.join(dataset_path, 'source.json'), 'w') as f:
+    #     json.dump(full_json, f)
+    #
+    # print(len(full_json))
+    with open(os.path.join(dataset_path, 'source.csv')) as f:
+        full_dataset = [l.strip() for l in f.readlines()]
 
     with open(os.path.join(dataset_path, 'payload.jsonl'), 'w') as f:
-        for tweet_id, text in tqdm(list(full_json.items())):
-            json.dump({"custom_id": tweet_id, "method": "POST", "url": "/v1/chat/completions",
+        # for tweet_id, text in tqdm(list(full_json.items())):
+        for tweet_id, text in tqdm(enumerate(full_dataset)):
+            json.dump({"custom_id": f"drug_{tweet_id}", "method": "POST", "url": "/v1/chat/completions",
                        "body": {
                            # "model": "gpt-4o-mini",
                            "model": "gpt-4o",
@@ -70,7 +88,7 @@ if __name__ == '__main__':
                            "messages": [
                                {
                                    "role": "user",
-                                   "content": translation_summarization_prompt.format(text=text)
+                                   "content": drug_name_mapping.format(text=text)
                                }
                            ],
                            "max_tokens": 1024,
@@ -94,7 +112,7 @@ if __name__ == '__main__':
         endpoint="/v1/chat/completions",
         completion_window="24h",
         metadata={
-            "description": "Text translation and summarization"
+            "description": "Drug mapping"
         }
     )
 

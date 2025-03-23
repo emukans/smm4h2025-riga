@@ -9,10 +9,13 @@ dotenv.load_dotenv()
 
 
 if __name__ == '__main__':
-    source_path = '../data/task1/stratified'
+    # source_path = '../data/task1/stratified'
+    source_path = '../data/task1'
     # task_type = 'translation2'
     # task_type = 'translate_summarize2'
-    task_type = 'drug_mining2'
+    # task_type = 'drug_mining2'
+    # task_type = 'ru_mapping_translate'
+    task_type = 'drug_mapping'
 
     response_path = os.path.join(source_path, task_type, 'response.json')
     with open(response_path, 'r') as f:
