@@ -23,7 +23,8 @@ if __name__ == '__main__':
     test_df = pd.read_csv(os.path.join(data_dir, 'dev_preprocessed.csv'))
     train_df = pd.read_csv(os.path.join(data_dir, 'train_preprocessed.csv'))
 
-    with open(os.path.join(data_dir, 'stratified/drug_mining2/processed.json'), 'r') as f:
+    # with open(os.path.join(data_dir, 'stratified/drug_mining2/processed.json'), 'r') as f:
+    with open(os.path.join(data_dir, 'stratified/drug_mining2/processed_description.json'), 'r') as f:
         normalized_drug_map = json.load(f)
 
     # augmentation_type = 'translation2'
@@ -56,4 +57,4 @@ if __name__ == '__main__':
         'test': Dataset.from_pandas(test_df)
     })
 
-    dataset.save_to_disk(f'../data/task1/ds_preprocessed_{augmentation_type}_with_drugs')
+    dataset.save_to_disk(f'../data/task1/ds_preprocessed_{augmentation_type}_with_drugs_description')

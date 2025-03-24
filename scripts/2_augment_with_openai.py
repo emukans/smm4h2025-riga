@@ -29,7 +29,7 @@ Text to process:
 {text}
 """
 
-drug_description_mining = """Extract a list of drugs that a mentioned in the text. Provide up to 3 sentences of description for every drug found. In the description mention the type and class of the drug, the purpose of the drug (used to diagnose, cure, treat, or prevent disease), whether is it a prescription or over-the-counter drug, and any other relevant information. If no drug in the text, then output null. The output should be provided as a list where each drug is on a new line. Every line starts with a bullet point *
+drug_description_mining = """You are provided with a drug name or active substance of the drug. Provide up to 3 sentences of description for the drug. In the description mention the type and class of the drug, the purpose of the drug (used to diagnose, cure, treat, or prevent disease), whether is it a prescription or over-the-counter drug, and any other relevant information. Additionally, provide up to 2 sentences of most known or common adverse drug events for the provided drug. If no adverse drug events known, then output just drug description. Both output values should be separated with a line-break.
 
 Text to process:
 {text}
@@ -56,7 +56,8 @@ if __name__ == '__main__':
     # task_type = 'translate_summarize2'
     # task_type = 'drug_mining2'
     # task_type = 'ru_mapping_translate'
-    task_type = 'drug_mapping'
+    # task_type = 'drug_mapping'
+    task_type = 'drug_description_mining'
     dataset_path = os.path.join(source_path, task_type)
     # os.makedirs(dataset_path, exist_ok=True)
     # full_json = {}
@@ -74,8 +75,8 @@ if __name__ == '__main__':
     #     json.dump(full_json, f)
     #
     # print(len(full_json))
-    with open(os.path.join(dataset_path, 'source.csv')) as f:
-        full_dataset = [l.strip() for l in f.readlines()]
+    with open(os.path.join(dataset_path, 'source.json')) as f:
+        full_dataset = json.load(f)
 
     with open(os.path.join(dataset_path, 'payload.jsonl'), 'w') as f:
         # for tweet_id, text in tqdm(list(full_json.items())):
@@ -88,16 +89,17 @@ if __name__ == '__main__':
                            "messages": [
                                {
                                    "role": "user",
-                                   "content": drug_name_mapping.format(text=text)
+                                   "content": drug_description_mining.format(text=text)
                                }
                            ],
-                           "max_tokens": 1024,
+                           "max_tokens": 150,
                            "temperature": 0,
                            "top_p": 1,
                            "frequency_penalty": 0,
                            "presence_penalty": 0}}, f)
             f.write('\n')
 
+    # print(len(full_dataset), len(set(full_dataset)))
     # exit()
     client = openai.OpenAI()
 
@@ -112,7 +114,7 @@ if __name__ == '__main__':
         endpoint="/v1/chat/completions",
         completion_window="24h",
         metadata={
-            "description": "Drug mapping"
+            "description": "Drug description mapping"
         }
     )
 

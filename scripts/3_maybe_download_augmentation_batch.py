@@ -15,7 +15,8 @@ if __name__ == '__main__':
     # task_type = 'translate_summarize2'
     # task_type = 'drug_mining2'
     # task_type = 'ru_mapping_translate'
-    task_type = 'drug_mapping'
+    # task_type = 'drug_mapping'
+    task_type = 'drug_description_mining'
 
     response_path = os.path.join(source_path, task_type, 'response.json')
     with open(response_path, 'r') as f:

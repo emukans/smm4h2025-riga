@@ -20,8 +20,12 @@ def build_map(augmentation_type):
     with open(os.path.join(data_dir, 'unmapped_drug_map.json')) as f:
         unmapped_drug_map = json.load(f)
 
+    with open(os.path.join(data_dir, 'drug_description.json')) as f:
+        drug_description_map = json.load(f)
+
     augmentation_path = os.path.join(data_dir, f'stratified/{augmentation_type}/augmentation_result.jsonl')
     drug_mining_map = {}
+    drug_mining_map_with_description = {}
     augmentation_map = set()
     multiple_mappings = []
     no_mappings = []
@@ -86,6 +90,7 @@ def build_map(augmentation_type):
                 line_drugs |= mapped_drugs
 
             drug_mining_map[result['custom_id']] = list(line_drugs)
+            drug_mining_map_with_description[result['custom_id']] = [drug_description_map[d] for d in line_drugs if d in drug_description_map]
 
     with open(os.path.join(data_dir, 'multiple_mappings.csv'), 'w') as f:
         writer = csv.writer(f)
@@ -104,6 +109,9 @@ def build_map(augmentation_type):
 
     with open(os.path.join(data_dir, 'ru_no_mappings_unique.csv'), 'w') as f:
         f.writelines([l + '\n' for l in ru_no_mappings])
+
+    with open(os.path.join(data_dir, f'stratified/{augmentation_type}/processed_description.json'), 'w') as f:
+        json.dump(drug_mining_map_with_description, f)
 
     with open(os.path.join(data_dir, f'stratified/{augmentation_type}/processed.json'), 'w') as f:
         json.dump(drug_mining_map, f)
