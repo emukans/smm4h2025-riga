@@ -4,6 +4,7 @@ import os
 import re
 
 import pandas as pd
+from rapidfuzz import process, fuzz
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from datasets import Dataset, DatasetDict
@@ -11,7 +12,7 @@ from datasets import Dataset, DatasetDict
 
 def build_map(augmentation_type):
 
-    with open(os.path.join(data_dir, 'drugbank_map.json')) as f:
+    with open(os.path.join(data_dir, 'full_name_map.json')) as f:
         drug_map = json.load(f)
 
     with open(os.path.join(data_dir, 'ru_drug_map.json')) as f:
@@ -33,7 +34,7 @@ def build_map(augmentation_type):
     ru_no_mappings = set()
     total_not_found = 0
     with open(augmentation_path, 'r') as f:
-        for line in f.readlines():
+        for line in tqdm(f.readlines()):
             result = json.loads(line)
             line_drugs = set()
             for result_line in result['response']['body']['choices'][0]['message']['content'].splitlines():
@@ -68,11 +69,16 @@ def build_map(augmentation_type):
 
                 mapped_drugs = set()
                 for drug in remapped_drugs:
-                    if drug in drug_map:
-                        mapped_drugs.add(drug_map[drug])
-                    elif has_remapped_drugs:
-                        # todo: for now force remapped drugs by gpt
-                        mapped_drugs.add(drug)
+                    match_result = process.extractOne(drug, drug_map.keys(), score_cutoff=0.95)
+                    matched_name = None
+                    if match_result is not None:
+                        matched_name, score, _ = match_result
+
+                    if matched_name:
+                        mapped_drugs.add(drug_map[matched_name])
+                    # elif has_remapped_drugs:
+                    #     # todo: for now force remapped drugs by gpt
+                    #     mapped_drugs.add(drug)
 
                 # mapped_drugs = {drug_map[d] for d in remapped_drugs if d in drug_map}
                 if len(mapped_drugs) > 1:
