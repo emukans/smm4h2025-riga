@@ -16,11 +16,11 @@ seed(42)
 np.random.seed(42)
 
 
-MAX_LEN = 100
-batch_size = 32
+MAX_LEN = 150
+batch_size = 16
 # epoch_count = 1
 epoch_count = 15
-learning_rate = 2e-5
+learning_rate = 5e-6
 downsample_size = 1
 
 
@@ -34,17 +34,21 @@ checkpoint = "cardiffnlp/twitter-roberta-large-topic-sentiment-latest"
 # checkpoint = "Azie88/COVID_Vaccine_Tweet_sentiment_analysis_roberta"
 # checkpoint = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
 # checkpoint = "papluca/xlm-roberta-base-language-detection"
+# checkpoint = "meta-llama/Llama-3.2-1B"
+# checkpoint = "FacebookAI/xlm-roberta-large"
 
 # dataset_type = 'plain_ds'
 # dataset_type = 'ds_preprocessed'
 # dataset_type = 'ds_preprocessed_translation'
 # dataset_type = 'ds_preprocessed_translate_summarize'
-dataset_type = 'ds_preprocessed_translate_summarize_full'
+# dataset_type = 'ds_preprocessed_translate_summarize_full'
+# dataset_type = 'ds_preprocessed_translate_summarize_with_drugs'
+dataset_type = 'ds_preprocessed_translate_summarize_with_drugs_description'
 
 os.environ["WANDB_PROJECT"] = "smm4h2025-task1-classification"
 os.environ["WANDB_LOG_MODEL"] = "false"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-7"
+os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-8"
 # os.environ["WANDB_NOTES"] = "Spans extracted by GPT3.5 from tweets, classification. Downample 0.2"
 
 
