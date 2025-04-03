@@ -23,6 +23,12 @@ if __name__ == '__main__':
     test_df = pd.read_csv(os.path.join(data_dir, 'dev_preprocessed.csv'))
     train_df = pd.read_csv(os.path.join(data_dir, 'train_preprocessed.csv'))
 
+    with open(os.path.join(data_dir, 'drug_classification.json'), 'r') as f:
+        classification_map = json.load(f)
+
+    with open(os.path.join(data_dir, 'drug_description.json'), 'r') as f:
+        description_map = json.load(f)
+
     with open(os.path.join(data_dir, 'stratified/drug_mining2/processed.json'), 'r') as f:
     # with open(os.path.join(data_dir, 'stratified/drug_mining2/processed_description.json'), 'r') as f:
         normalized_drug_map = json.load(f)
@@ -46,8 +52,14 @@ if __name__ == '__main__':
     for id_, drug_list in tqdm(normalized_drug_map.items()):
         if not len(drug_list):
             continue
-        train_df.loc[train_df['id'] == id_, 'text'] = ' [sep] ' + '[sep] '.join(drug_list) + train_df[train_df['id'] == id_]['text']
-        test_df.loc[test_df['id'] == id_, 'text'] = ' [sep] ' + '[sep] '.join(drug_list) + test_df[test_df['id'] == id_]['text']
+
+        # classification_text = ' [desc] '.join([classification_map[drug.lower()] for drug in drug_list if classification_map[drug.lower()]])
+        classification_text = ' [desc] '.join([description_map[drug.lower()] for drug in drug_list if description_map[drug.lower()]])
+        classification_text = ' [desc] ' + classification_text if len(classification_text) else ''
+        train_df.loc[train_df['id'] == id_, 'text'] = ' [drug] '.join(drug_list) + classification_text + ' [sep] ' + train_df[train_df['id'] == id_]['text']
+        test_df.loc[test_df['id'] == id_, 'text'] = ' [drug] '.join(drug_list) + classification_text + ' [sep] ' + test_df[test_df['id'] == id_]['text']
+        # train_df.loc[train_df['id'] == id_, 'text'] = train_df[train_df['id'] == id_]['text'] + ' [sep] ' + '[sep] '.join(drug_list)
+        # test_df.loc[test_df['id'] == id_, 'text'] = test_df[test_df['id'] == id_]['text'] + ' [sep] ' + '[sep] '.join(drug_list)
 
     train_df, val_df = train_test_split(train_df, test_size=0.2, shuffle=True)
 
@@ -57,4 +69,4 @@ if __name__ == '__main__':
         'test': Dataset.from_pandas(test_df)
     })
 
-    dataset.save_to_disk(f'../data/task1/ds_preprocessed_{augmentation_type}_with_drugbank_names')
+    dataset.save_to_disk(f'../data/task1/ds_preprocessed_{augmentation_type}_with_drugbank_description')
