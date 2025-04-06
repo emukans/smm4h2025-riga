@@ -4,16 +4,32 @@ import os
 from glob import glob
 import dotenv
 
-import openai
 from tqdm import tqdm
 
 
 dotenv.load_dotenv()
 
+import openai
 
 translation_prompt = """Translate to English. Output just the result of the translation without any supplementary text. Keep the original semantic, orthography and punctuation.
 
 Text for translation:
+{text}
+"""
+
+translation_advanced_prompt = """Translate to English and paraphrase highlighting already happened adverse drug events. You are also provided with additional context of drug names mentioned in the text, corresponsing drug description and adverse drug effects that could cause the drug. Output just the result of the translation and paraphasing without any supplementary text. 
+Context:
+{context}
+
+Text for translation:
+{text}
+"""
+
+paraphrase_advanced_prompt = """Paraphrase highlighting already happened adverse drug events. You are also provided with additional context of drug names mentioned in the text, corresponsing drug description and adverse drug effects that could cause the drug. Output just the result of the paraphasing without any supplementary text. 
+Context:
+{context}
+
+Text for paraphrasing:
 {text}
 """
 
@@ -22,6 +38,15 @@ translation_summarization_prompt = """Summarize and translate to English. Output
 Text to process:
 {text}
 """
+
+translation_summarization_advanced_prompt = """You are provided with a text. Summarize and translate it to English. You are also provided with additional context of drug names mentioned in the text, corresponsing drug description and adverse drug effects that could cause the drug. Output just the result of the translation without any supplementary text. Keep the original semantic, orthography and punctuation. The summarization should focus on detection of adverse drug events. Irrelevant and formal information, such as greetings, closing, etc, could be omitted. Keep the named and nominal and named entities related to drugs, symptoms and drug effects. The output should be up to 5 sentences. The first sentence should list all already happened adverse drug events that the person reports if there are any of them.
+Context:
+{context}
+
+Text to process:
+{text}
+"""
+
 
 drug_mining = """Extract a list of drugs that a mentioned in the text. If there are multiple options for a valid drug name, then provide them in brackets as comma-separated. If no drug in the text, then output null. The output should be provided as a list where each drug is on a new line. Every line starts with a bullet point *
 
@@ -47,9 +72,14 @@ Text to process:
 {text}
 """
 
+ade_mining = """You are provided with drug name and description information. Summarize possible adverse drug effects or symptoms that could be caused by taking this drug by a human. Take the information from the provided context. Each line in the output could contain only one symptom or effect description. The description should be brief and concise. If not adverse effects or symptoms, then output null.
+
+{text}
+"""
+
 
 if __name__ == '__main__':
-    # source_path = '../data/task1/stratified'
+    stratified_source_path = '../data/task1/stratified'
     source_path = '../data/task1'
 
     # task_type = 'translation2'
@@ -57,31 +87,99 @@ if __name__ == '__main__':
     # task_type = 'drug_mining2'
     # task_type = 'ru_mapping_translate'
     # task_type = 'drug_mapping'
-    task_type = 'drug_description_mining'
-    dataset_path = os.path.join(source_path, task_type)
-    # os.makedirs(dataset_path, exist_ok=True)
-    # full_json = {}
-    # split_list = ['dev', 'train']
-    # # stratification_type_list = ['de', 'fr', 'ru']
-    # # stratification_type_list = ['de', 'fr', 'ru', 'en']
+    # task_type = 'drug_description_mining'
+    # task_type = 'ade_mining'
+    # task_type = 'translate_summarize_advanced'
+    # task_type = 'translate_advanced'
+    task_type = 'paraphrase_advanced'
+    dataset_path = os.path.join(stratified_source_path, task_type)
+    os.makedirs(dataset_path, exist_ok=True)
+    full_json = {}
+    split_list = ['dev', 'train']
+    stratification_type_list = ['en']
+    # stratification_type_list = ['de', 'fr', 'ru', 'en']
     # stratification_type_list = ['forum post', 'review']
-    # for split in split_list:
-    #     for stratify_by in stratification_type_list:
-    #         with open(os.path.join(source_path, f'{split}_type_{stratify_by}.json'), 'r') as f:
-    #         # with open(os.path.join(source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
-    #             full_json.update(json.load(f))
-    #
-    # with open(os.path.join(dataset_path, 'source.json'), 'w') as f:
-    #     json.dump(full_json, f)
-    #
-    # print(len(full_json))
+    for split in split_list:
+        for stratify_by in stratification_type_list:
+            # with open(os.path.join(stratified_source_path, f'{split}_type_{stratify_by}.json'), 'r') as f:
+            with open(os.path.join(stratified_source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
+                full_json.update(json.load(f))
+
+    with open(os.path.join(dataset_path, 'source.json'), 'w') as f:
+        json.dump(full_json, f)
+
+    print(len(full_json))
     with open(os.path.join(dataset_path, 'source.json')) as f:
         full_dataset = json.load(f)
 
+    with open(os.path.join(source_path, 'drug_classification.json')) as f:
+        drug_classification = json.load(f)
+
+    with open(os.path.join(source_path, 'drug_description.json')) as f:
+        drug_description = json.load(f)
+
+    with open(os.path.join(source_path, 'food_interactions.json')) as f:
+        food_interactions = json.load(f)
+
+    with open(os.path.join(source_path, 'indication.json')) as f:
+        indication = json.load(f)
+
+    with open(os.path.join(source_path, 'mechanism_of_action.json')) as f:
+        mechanism_of_action = json.load(f)
+
+    with open(os.path.join(source_path, 'toxicity.json')) as f:
+        toxicity = json.load(f)
+
+    with open(os.path.join(source_path, 'known_interaction_description.json')) as f:
+        known_interaction_description = json.load(f)
+
+    with open(os.path.join(stratified_source_path, 'drug_mining2', 'processed.json')) as f:
+        tweet_drug_map = json.load(f)
+
+    i = 0
     with open(os.path.join(dataset_path, 'payload.jsonl'), 'w') as f:
-        # for tweet_id, text in tqdm(list(full_json.items())):
-        for tweet_id, text in tqdm(enumerate(full_dataset)):
-            json.dump({"custom_id": f"drug_{tweet_id}", "method": "POST", "url": "/v1/chat/completions",
+        for tweet_id, text in tqdm(list(full_dataset.items())):
+        # for tweet_id, drug_name in tqdm(enumerate(full_dataset)):
+            context = ''
+            drug_to_skip = []
+            drug_interactions = []
+
+            for drug_name in tweet_drug_map[tweet_id]:
+                drug_name = drug_name.lower()
+                if not len(drug_description[drug_name]) and not len(drug_classification[drug_name]):
+                    continue
+                i += 1
+
+                context = f'Drug: {drug_name}\n\nDescription:\n{drug_description[drug_name]}\n\nClassification:\n{drug_classification[drug_name]}\n\n'
+                if indication[drug_name]:
+                    context += f'Indication:\n{indication[drug_name]}\n\n'
+
+                if food_interactions[drug_name]:
+                    context += f'Food Interactions:\n{"\n".join(food_interactions[drug_name])}\n\n'
+
+                if mechanism_of_action[drug_name]:
+                    context += f'Mechanism of action:\n{mechanism_of_action[drug_name]}\n\n'
+
+                if toxicity[drug_name]:
+                    context += f'Toxicity:\n{toxicity[drug_name]}\n\n'
+
+                if not len(known_interaction_description[drug_name]) or drug_name in drug_to_skip:
+                    continue
+
+                for drug_to_check in tweet_drug_map[tweet_id]:
+                    if drug_to_check == drug_name or drug_to_check not in known_interaction_description[drug_name]:
+                        continue
+
+                    drug_interactions.append(known_interaction_description[drug_name][drug_to_check])
+                    drug_to_skip.append(drug_to_check)
+
+            if len(drug_interactions):
+                context += f'\nInteractions:\n{"\n".join(drug_interactions)}\n\n'
+
+            if not len(context):
+                context = 'No context'
+
+            json.dump({"custom_id": tweet_id, "method": "POST", "url": "/v1/chat/completions",
                        "body": {
                            # "model": "gpt-4o-mini",
                            "model": "gpt-4o",
@@ -89,17 +187,17 @@ if __name__ == '__main__':
                            "messages": [
                                {
                                    "role": "user",
-                                   "content": drug_description_mining.format(text=text)
+                                   "content": paraphrase_advanced_prompt.format(context=context, text=text)
                                }
                            ],
-                           "max_tokens": 150,
+                           "max_tokens": 300,
                            "temperature": 0,
                            "top_p": 1,
                            "frequency_penalty": 0,
-                           "presence_penalty": 0}}, f)
+                           "presence_penalty": 0}}, f, ensure_ascii=False)
             f.write('\n')
 
-    # print(len(full_dataset), len(set(full_dataset)))
+    print(len(full_dataset), len(set(full_dataset)), i)
     # exit()
     client = openai.OpenAI()
 
@@ -114,7 +212,7 @@ if __name__ == '__main__':
         endpoint="/v1/chat/completions",
         completion_window="24h",
         metadata={
-            "description": "Drug description mapping"
+            "description": "Paraphrase advanced"
         }
     )
 

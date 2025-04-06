@@ -23,20 +23,36 @@ if __name__ == '__main__':
     test_df = pd.read_csv(os.path.join(data_dir, 'dev_preprocessed.csv'))
     train_df = pd.read_csv(os.path.join(data_dir, 'train_preprocessed.csv'))
 
+    # train_df = train_df[train_df['language'].isin(['de', 'fr'])]
+    # test_df = test_df[test_df['language'].isin(['de', 'fr'])]
+
+    with open(os.path.join(data_dir, 'known_interactions.json'), 'r') as f:
+        known_interactions_map = json.load(f)
+
+    with open(os.path.join(data_dir, 'known_interaction_description.json'), 'r') as f:
+        known_interaction_description_map = json.load(f)
+
+    with open(os.path.join(data_dir, 'food_interactions.json'), 'r') as f:
+        food_interactions_map = json.load(f)
+
     with open(os.path.join(data_dir, 'drug_classification.json'), 'r') as f:
         classification_map = json.load(f)
 
     with open(os.path.join(data_dir, 'drug_description.json'), 'r') as f:
         description_map = json.load(f)
 
+    with open(os.path.join(data_dir, 'drug_ade.json'), 'r') as f:
+        drug_ade = json.load(f)
+
     with open(os.path.join(data_dir, 'stratified/drug_mining2/processed.json'), 'r') as f:
     # with open(os.path.join(data_dir, 'stratified/drug_mining2/processed_description.json'), 'r') as f:
         normalized_drug_map = json.load(f)
 
     # augmentation_type = 'translation2'
-    augmentation_type = 'translate_summarize2'
+    augmentation_type = 'translate_summarize_advanced'
 
-    translate_map = build_map('translation2')
+    translate_map = build_map('translate_advanced')
+    paraphrase_map = build_map('paraphrase_advanced')
     translate_summarize_map = build_map(augmentation_type)
 
     for id_, content in tqdm(translate_map.items()):
@@ -45,21 +61,91 @@ if __name__ == '__main__':
         train_df.loc[train_df['id'] == id_, 'text'] = content
         test_df.loc[test_df['id'] == id_, 'text'] = content
 
+    for id_, content in tqdm(paraphrase_map.items()):
+        train_df.loc[train_df['id'] == id_, 'text'] = content
+        test_df.loc[test_df['id'] == id_, 'text'] = content
+
     for id_, content in tqdm(translate_summarize_map.items()):
         train_df.loc[train_df['id'] == id_, 'text'] = content
         test_df.loc[test_df['id'] == id_, 'text'] = content
 
     for id_, drug_list in tqdm(normalized_drug_map.items()):
+        # continue
         if not len(drug_list):
             continue
 
-        # classification_text = ' [desc] '.join([classification_map[drug.lower()] for drug in drug_list if classification_map[drug.lower()]])
-        classification_text = ' [desc] '.join([description_map[drug.lower()] for drug in drug_list if description_map[drug.lower()]])
-        classification_text = ' [desc] ' + classification_text if len(classification_text) else ''
-        train_df.loc[train_df['id'] == id_, 'text'] = ' [drug] '.join(drug_list) + classification_text + ' [sep] ' + train_df[train_df['id'] == id_]['text']
-        test_df.loc[test_df['id'] == id_, 'text'] = ' [drug] '.join(drug_list) + classification_text + ' [sep] ' + test_df[test_df['id'] == id_]['text']
-        # train_df.loc[train_df['id'] == id_, 'text'] = train_df[train_df['id'] == id_]['text'] + ' [sep] ' + '[sep] '.join(drug_list)
-        # test_df.loc[test_df['id'] == id_, 'text'] = test_df[test_df['id'] == id_]['text'] + ' [sep] ' + '[sep] '.join(drug_list)
+        has_drug_interaction = False
+        for to_check_drug in drug_list:
+            if has_drug_interaction:
+                break
+            interaction_list = known_interactions_map[to_check_drug]
+            for checking_drug in drug_list:
+                if checking_drug == to_check_drug:
+                    continue
+
+                if checking_drug in interaction_list:
+                    has_drug_interaction = True
+                    break
+
+        drug_interaction_text = ''
+        if has_drug_interaction:
+            drug_interaction_text = ' [sep] has known drug interaction'
+
+        drug_interaction_description_text = []
+        drug_to_skip = []
+        for to_check_drug in drug_list:
+            if to_check_drug in drug_to_skip:
+                continue
+            interaction_list = known_interaction_description_map[to_check_drug]
+            for checking_drug in drug_list:
+                if checking_drug == to_check_drug:
+                    continue
+
+                if checking_drug in interaction_list:
+                    drug_to_skip.append(checking_drug)
+                    drug_interaction_description_text.append(interaction_list[checking_drug])
+                    break
+
+        drug_interaction_description_text = ' [ade] '.join(drug_interaction_description_text)
+        if len(drug_interaction_description_text):
+            drug_interaction_description_text = ' [ade] ' + drug_interaction_description_text
+
+        has_food_interaction = any(len(food_interactions_map[drug]) > 0 for drug in drug_list)
+
+        food_interaction_text = ''
+        if has_food_interaction:
+            food_interaction_text = ' [sep] has known food interaction'
+
+        classification_text = []
+        for drug in drug_list:
+            if not len(classification_map[drug.lower()]):
+                classification_text.append(f' [drug] {drug}')
+                continue
+
+            classification_text.append(f' [drug] {drug} [desc] {classification_map[drug]}')
+        classification_text = ''.join(classification_text).strip()
+
+        ade_text = []
+        for drug in drug_list:
+            if drug.lower() not in drug_ade:
+                ade_text.append(f' [drug] {drug}')
+                continue
+
+            ade_text.append(f' [drug] {drug} [ade] {" [ade] ".join(drug_ade[drug])}')
+        ade_text = ''.join(ade_text).strip()
+
+        ade_short_text = []
+        for drug in drug_list:
+            if drug.lower() not in drug_ade:
+                continue
+
+            ade_short_text.append(f' [ade] {" [ade] ".join(drug_ade[drug])}')
+        ade_short_text = ''.join(ade_short_text).strip()
+
+        drug_text = '[drug] ' + ' [drug] '.join(drug_list)
+
+        train_df.loc[train_df['id'] == id_, 'text'] = ade_text + ' [sep] ' + train_df[train_df['id'] == id_]['text']
+        test_df.loc[test_df['id'] == id_, 'text'] = ade_text + ' [sep] ' + test_df[test_df['id'] == id_]['text']
 
     train_df, val_df = train_test_split(train_df, test_size=0.2, shuffle=True)
 
@@ -69,4 +155,5 @@ if __name__ == '__main__':
         'test': Dataset.from_pandas(test_df)
     })
 
-    dataset.save_to_disk(f'../data/task1/ds_preprocessed_{augmentation_type}_with_drugbank_description')
+    dataset.save_to_disk(f'../data/task1/ds_preprocessed_{augmentation_type}_with_ade')
+    # dataset.save_to_disk(f'../data/task1/ds_preprocessed_defr_with_classification2_drug_food_interaction')
