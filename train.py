@@ -1,3 +1,4 @@
+import sys
 from random import seed
 
 import wandb
@@ -15,19 +16,24 @@ from transformers import DataCollatorWithPadding
 seed(42)
 np.random.seed(42)
 
+iteration = int(sys.argv[1])
+gpu = int(os.environ['CUDA_VISIBLE_DEVICES'])
 
+
+# todo: try longer contexts
 MAX_LEN = 150
 batch_size = 16
 # epoch_count = 1
 epoch_count = 15
 learning_rate = 5e-6
-downsample_size = 1
+cased = True
+weight_decay = 0.001
 
 
 # checkpoint = "distilbert/distilbert-base-uncased"
 # checkpoint = "cardiffnlp/tweet-topic-21-multi"
 # checkpoint = "cardiffnlp/twitter-roberta-base-sentiment-latest"
-checkpoint = "cardiffnlp/twitter-roberta-large-topic-sentiment-latest"
+checkpoint = "cardiffnlp/twitter-roberta-large-topic-sentiment-latest"  # this
 # checkpoint = "cardiffnlp/twitter-roberta-large-hate-latest"
 # checkpoint = "microsoft/Multilingual-MiniLM-L12-H384"
 # checkpoint = "microsoft/deberta-v2-xxlarge-mnli"
@@ -36,6 +42,8 @@ checkpoint = "cardiffnlp/twitter-roberta-large-topic-sentiment-latest"
 # checkpoint = "papluca/xlm-roberta-base-language-detection"
 # checkpoint = "meta-llama/Llama-3.2-1B"
 # checkpoint = "FacebookAI/xlm-roberta-large"
+# checkpoint = "EuroBERT/EuroBERT-610m"  # this
+# checkpoint = "EuroBERT/EuroBERT-2.1B"
 
 # dataset_type = 'plain_ds'
 # dataset_type = 'ds_preprocessed'
@@ -43,21 +51,68 @@ checkpoint = "cardiffnlp/twitter-roberta-large-topic-sentiment-latest"
 # dataset_type = 'ds_preprocessed_translate_summarize'
 # dataset_type = 'ds_preprocessed_translate_summarize_full'
 # dataset_type = 'ds_preprocessed_translate_summarize_with_drugs'
-dataset_type = 'ds_preprocessed_translate_summarize_with_drugs_description'
+# dataset_type = 'ds_preprocessed_translate_summarize_with_drugs_description'
+# dataset_type = 'ds_preprocessed_translate_summarize_with_drugbank_names'
+# dataset_type = 'ds_preprocessed_translate_summarize_with_drugbank_names2'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_drugbank_description'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_drugbank_classification'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_classification2'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_classification2_food_interaction'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_classification2_drug_interaction'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_classification2_drug_food_interaction'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_drug_interaction'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_food_interaction'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_drug_food_interaction'
+# dataset_type = 'ds_preprocessed_with_classification2_drug_food_interaction'  # try this
+# dataset_type = 'ds_preprocessed_enru_with_classification2_drug_food_interaction'
+# dataset_type = 'ds_preprocessed_en_with_classification2_drug_food_interaction'
+# dataset_type = 'ds_preprocessed_defr_with_classification2_drug_food_interaction'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_ade'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_interaction_description'
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced'
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_drugs'
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_drugs_interaction'
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_classification'
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_classification_description'  # todo
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_classification_description_ade'  # todo
 
+dataset_gpu_map = [
+    ['ds_preprocessed_translate_summarize_advanced', 'ds_preprocessed_translate_summarize_advanced_with_drugs'],
+    ['ds_preprocessed_translate_summarize_advanced_with_drugs_interaction', 'ds_preprocessed_translate_summarize_advanced_with_classification'],
+    ['ds_preprocessed_translate_summarize_advanced_with_classification_description', 'ds_preprocessed_translate_summarize_advanced_with_classification_description_ade'],
+    ['ds_preprocessed_translate_summarize_advanced_with_ade_description', 'ds_preprocessed_translate_summarize_advanced_with_ade']
+]
+
+dataset_type = dataset_gpu_map[gpu][iteration % 2]
+
+if 0 <= iteration < 2:
+    MAX_LEN = 100
+elif 2 <= iteration < 4:
+    MAX_LEN = 150
+elif 4 <= iteration < 6:
+    MAX_LEN = 200
+elif 6 <= iteration < 8:
+    MAX_LEN = 300
+elif 8 <= iteration < 10:
+    MAX_LEN = 200
+    weight_decay = 0.0001
+
+print(dataset_type, MAX_LEN, weight_decay, os.path.exists(f'data/task1/{dataset_type}'))
+
+# exit()
 os.environ["WANDB_PROJECT"] = "smm4h2025-task1-classification"
 os.environ["WANDB_LOG_MODEL"] = "false"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-downsample-{downsample_size}-max_len-{MAX_LEN}-8"
+os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-max_len-{MAX_LEN}-cased-{cased}-decay-{weight_decay}-9-{iteration}"
 # os.environ["WANDB_NOTES"] = "Spans extracted by GPT3.5 from tweets, classification. Downample 0.2"
 
 
 id2label = {0: "negative", 1: "positive"}
 label2id = {"negative": 0, "positive": 1}
 
-tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+tokenizer = AutoTokenizer.from_pretrained(checkpoint, trust_remote_code=True)
 model = AutoModelForSequenceClassification.from_pretrained(
-    checkpoint, num_labels=len(id2label), id2label=id2label, label2id=label2id, ignore_mismatched_sizes=True
+    checkpoint, num_labels=len(id2label), id2label=id2label, label2id=label2id, ignore_mismatched_sizes=True, trust_remote_code=True
 )
 # model = AutoModelForSequenceClassification.from_pretrained('model/' + os.environ["WANDB_NAME"])
 
@@ -88,11 +143,10 @@ wandb.log({
 
 
 def preprocess_function(examples):
-    return tokenizer([s for s in examples["text"]], max_length=MAX_LEN, truncation=True, padding='max_length')
+    return tokenizer([s if cased else s.lower() for s in examples["text"]], max_length=MAX_LEN, truncation=True, padding='max_length')
 
 
 dataset = dataset.map(preprocess_function, batched=True)
-
 
 training_args = TrainingArguments(
     output_dir="model/" + os.environ["WANDB_NAME"],
@@ -100,7 +154,7 @@ training_args = TrainingArguments(
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
     num_train_epochs=epoch_count,
-    weight_decay=0.001,
+    weight_decay=weight_decay,
     eval_strategy="epoch",
     save_strategy="epoch",
     save_total_limit=2,
