@@ -4,30 +4,34 @@ from random import seed
 import wandb
 
 import os
+import torch
 
 import numpy as np
+from sklearn.metrics import precision_recall_curve
+import torch.nn.functional as F
 
 from datasets import DatasetDict
 import evaluate
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer
 from transformers import DataCollatorWithPadding
+from datasets import concatenate_datasets
 
 
 seed(42)
 np.random.seed(42)
 
-iteration = int(sys.argv[1])
-gpu = int(os.environ['CUDA_VISIBLE_DEVICES'])
+# iteration = int(sys.argv[1])
+# gpu = int(os.environ['CUDA_VISIBLE_DEVICES'])
 
 
 # todo: try longer contexts
 MAX_LEN = 150
 batch_size = 16
 # epoch_count = 1
-epoch_count = 15
+epoch_count = 20
 learning_rate = 5e-6
-cased = True
-weight_decay = 0.001
+cased = False
+weight_decay = 0.0001
 
 
 # checkpoint = "distilbert/distilbert-base-uncased"
@@ -73,37 +77,47 @@ checkpoint = "cardiffnlp/twitter-roberta-large-topic-sentiment-latest"  # this
 # dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_drugs'
 # dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_drugs_interaction'
 # dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_classification'
-# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_classification_description'  # todo
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_classification_description'
 # dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_classification_description_ade'  # todo
+dataset_type = 'ds_preprocessed_translate_summarize2_with_gpt'
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_gpt'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_gpt_drug_ade'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_gpt_drug_classification'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_gpt_drug2'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_gpt_drug_aug_2'
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_gpt_drug_2'
+# dataset_type = 'ds_preprocessed_translate_summarize_advanced_with_gpt_drug_aug_2'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_gpt_drug_interaction_2'
+# dataset_type = 'ds_preprocessed_translate_summarize2_with_gpt_drug_food_interaction_2'
 
-dataset_gpu_map = [
-    ['ds_preprocessed_translate_summarize_advanced', 'ds_preprocessed_translate_summarize_advanced_with_drugs'],
-    ['ds_preprocessed_translate_summarize_advanced_with_drugs_interaction', 'ds_preprocessed_translate_summarize_advanced_with_classification'],
-    ['ds_preprocessed_translate_summarize_advanced_with_classification_description', 'ds_preprocessed_translate_summarize_advanced_with_classification_description_ade'],
-    ['ds_preprocessed_translate_summarize_advanced_with_ade_description', 'ds_preprocessed_translate_summarize_advanced_with_ade']
-]
-
-dataset_type = dataset_gpu_map[gpu][iteration % 2]
-
-if 0 <= iteration < 2:
-    MAX_LEN = 100
-elif 2 <= iteration < 4:
-    MAX_LEN = 150
-elif 4 <= iteration < 6:
-    MAX_LEN = 200
-elif 6 <= iteration < 8:
-    MAX_LEN = 300
-elif 8 <= iteration < 10:
-    MAX_LEN = 200
-    weight_decay = 0.0001
-
-print(dataset_type, MAX_LEN, weight_decay, os.path.exists(f'data/task1/{dataset_type}'))
+# dataset_gpu_map = [
+#     ['ds_preprocessed_translate_summarize2_with_gpt', 'ds_preprocessed_translate_summarize_advanced_with_drugs'],
+#     ['ds_preprocessed_translate_summarize_advanced_with_gpt', 'ds_preprocessed_translate_summarize_advanced_with_classification'],
+#     ['ds_preprocessed_translate_summarize_advanced_with_classification_description', 'ds_preprocessed_translate_summarize_advanced_with_classification_description_ade'],
+#     ['ds_preprocessed_translate_summarize_advanced_with_ade_description', 'ds_preprocessed_translate_summarize_advanced_with_ade']
+# ]
+#
+# dataset_type = dataset_gpu_map[gpu][iteration % 2]
+#
+# if 0 <= iteration < 2:
+#     MAX_LEN = 100
+# elif 2 <= iteration < 4:
+#     MAX_LEN = 150
+# elif 4 <= iteration < 6:
+#     MAX_LEN = 200
+# elif 6 <= iteration < 8:
+#     MAX_LEN = 300
+# elif 8 <= iteration < 10:
+#     MAX_LEN = 200
+#     weight_decay = 0.0001
+#
+# print(dataset_type, MAX_LEN, weight_decay, os.path.exists(f'data/task1/{dataset_type}'))
 
 # exit()
 os.environ["WANDB_PROJECT"] = "smm4h2025-task1-classification"
 os.environ["WANDB_LOG_MODEL"] = "false"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-max_len-{MAX_LEN}-cased-{cased}-decay-{weight_decay}-9-{iteration}"
+os.environ["WANDB_NAME"] = f"{checkpoint}/{dataset_type}/lr-{learning_rate}-max_len-{MAX_LEN}-cased-{cased}-decay-{weight_decay}-12-join"
 # os.environ["WANDB_NOTES"] = "Spans extracted by GPT3.5 from tweets, classification. Downample 0.2"
 
 
@@ -122,14 +136,37 @@ accuracy = evaluate.combine(["accuracy", "f1", "precision", "recall"])
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
-    predictions = np.argmax(predictions, axis=1)
-    return accuracy.compute(predictions=predictions, references=labels)
+    predictions_max = np.argmax(predictions, axis=1)
+
+    results = accuracy.compute(predictions=predictions_max, references=labels)
+
+    predictions_sigmoid = F.softmax(torch.Tensor(predictions))
+    precision, recall, thresholds = precision_recall_curve(labels, predictions_sigmoid[:, 1])
+
+    f1_scores = (2 * precision * recall) / (precision + recall)
+
+    best_idx = np.nanargmax(f1_scores)
+
+    results['best_threshold'] = thresholds[best_idx]
+    results['best_f1'] = f1_scores[best_idx]
+
+    # wandb.log({
+    #     'eval/roc_curve': wandb.plot.roc_curve(labels, predictions),
+    #     'eval/pr_curve': wandb.plot.pr_curve(labels, predictions)
+    # })
+
+    return results
 
 
 wandb.init()
 
 ds_path = f'data/task1/{dataset_type}'
 dataset = DatasetDict.load_from_disk(ds_path)
+
+
+# dataset['dev'] = dataset['dev'].select(range(20))
+# dataset['test'] = dataset['test'].select(range(20))
+
 dev_df = dataset['dev'].to_pandas().copy()
 test_df = dataset['test'].to_pandas().copy()
 
@@ -148,6 +185,8 @@ def preprocess_function(examples):
 
 dataset = dataset.map(preprocess_function, batched=True)
 
+joined_dataset = concatenate_datasets([dataset['train'], dataset['dev']]).shuffle(seed=42)
+
 training_args = TrainingArguments(
     output_dir="model/" + os.environ["WANDB_NAME"],
     learning_rate=learning_rate,
@@ -165,8 +204,9 @@ training_args = TrainingArguments(
 trainer = Trainer(
     model=model,
     args=training_args,
-    train_dataset=dataset['train'],
-    eval_dataset=dataset['dev'],
+    train_dataset=joined_dataset,
+    # train_dataset=dataset['dev'],
+    eval_dataset=dataset['test'],
     tokenizer=tokenizer,
     data_collator=data_collator,
     compute_metrics=compute_metrics,
@@ -187,18 +227,23 @@ def stratified_predictions(df, category, split):
 
     return result
 
-
-dev_predictions = trainer.predict(dataset['dev'], metric_key_prefix='eval')
-dev_df['prediction'] = np.argmax(dev_predictions.predictions, axis=1)
-# dev_df.to_csv('data/task1/dev_result.csv', index=False)
-
-wandb.log(stratified_predictions(dev_df, 'language', 'eval'))
-wandb.log(stratified_predictions(dev_df, 'type', 'eval'))
+# dev_predictions = trainer.predict(dataset['dev'], metric_key_prefix='eval')
+# dev_df['prediction'] = np.argmax(dev_predictions.predictions, axis=1)
+# # dev_df.to_csv('data/task1/dev_result.csv', index=False)
+# # exit()
+# wandb.log(stratified_predictions(dev_df, 'language', 'eval'))
+# wandb.log(stratified_predictions(dev_df, 'type', 'eval'))
+#
+# wandb.log({"eval/roc_curve": wandb.plot.roc_curve(dev_df['label'].tolist(), dev_predictions.predictions)})
+# wandb.log({"eval/pr_curve": wandb.plot.pr_curve(dev_df['label'].tolist(), dev_predictions.predictions)})
 
 
 test_predictions = trainer.predict(dataset['test'], metric_key_prefix='test')
 test_df['prediction'] = np.argmax(test_predictions.predictions, axis=1)
 # test_df.to_csv('data/task1/test_result.csv', index=False)
+
+wandb.log({"test/roc_curve": wandb.plot.roc_curve(test_df['label'].tolist(), test_predictions.predictions)})
+wandb.log({"test/pr_curve": wandb.plot.pr_curve(test_df['label'].tolist(), test_predictions.predictions)})
 
 wandb.log(stratified_predictions(test_df, 'language', 'test'))
 wandb.log(stratified_predictions(test_df, 'type', 'test'))
