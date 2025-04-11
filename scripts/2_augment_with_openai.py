@@ -3,6 +3,7 @@ import json
 import os
 from glob import glob
 import dotenv
+import tiktoken
 
 from tqdm import tqdm
 
@@ -47,6 +48,14 @@ Text to process:
 {text}
 """
 
+ade_mining_advanced_prompt = """You are provided with a text. List all already happened adverse drug effects caused by taking medications. Ignore symptoms that are cured by the mentioned drugs. You are also provided with additional context of drug names mentioned in the text, corresponding drug descriptions, and adverse drug effects that could cause the drug. Output just the list of adverse effects without any supplementary. The output text should be in English. Each line could contain only one adverse effect. If no adverse effects, then output null.
+Context:
+{context}
+
+Text to process:
+{text}
+"""
+
 
 drug_mining = """Extract a list of drugs that a mentioned in the text. If there are multiple options for a valid drug name, then provide them in brackets as comma-separated. If no drug in the text, then output null. The output should be provided as a list where each drug is on a new line. Every line starts with a bullet point *
 
@@ -60,7 +69,7 @@ Text to process:
 {text}
 """
 
-ru_drug_name_translate = """Translate drug name to English. Output just the name.
+ru_drug_name_translate = """Translate drug name to English. Output just the name. If provided text is not a drug, then output null.
 
 Text to process:
 {text}
@@ -77,27 +86,43 @@ ade_mining = """You are provided with drug name and description information. Sum
 {text}
 """
 
+tweet_augmentation = """You are provided with data entries. The task is to augment the data and output 5 more data entries with supplemental information. The original source is social media resources, such as Twitter, forums, and reviews. The output should be in English and written in the similar manner as the provided samples. Text entry in the input could have different length, but the text entry in the output should not exceed 3 sentences. Output just the augmentation result without any supplementary text.
+[Structure]
+Drugs: [comma-separated list of drugs mentioned in the text or null]
+Symptoms: [comma-separated list of adverse drug effects, that are caused by taking drug or null]
+Text: [a sample of the data]
+---
+[Samples]
+{text}
+"""
+
 
 if __name__ == '__main__':
-    stratified_source_path = '../data/task1/stratified'
+    stratified_source_path = '../data/task1/test_stratified'
     source_path = '../data/task1'
+
+    encoder = tiktoken.encoding_for_model("gpt-4o")
 
     # task_type = 'translation2'
     # task_type = 'translate_summarize2'
     # task_type = 'drug_mining2'
-    # task_type = 'ru_mapping_translate'
+    # task_type = 'test_ru_mapping_translate'
     # task_type = 'drug_mapping'
     # task_type = 'drug_description_mining'
-    # task_type = 'ade_mining'
+    task_type = 'ade_mining'
     # task_type = 'translate_summarize_advanced'
     # task_type = 'translate_advanced'
-    task_type = 'paraphrase_advanced'
+    # task_type = 'paraphrase_advanced'
+    # task_type = 'ade_mining_advanced'
+    # task_type = 'train_tweet_augmentation'
+    # dataset_path = os.path.join(stratified_source_path, task_type)
     dataset_path = os.path.join(stratified_source_path, task_type)
     os.makedirs(dataset_path, exist_ok=True)
     full_json = {}
-    split_list = ['dev', 'train']
-    stratification_type_list = ['en']
-    # stratification_type_list = ['de', 'fr', 'ru', 'en']
+    # split_list = ['dev', 'train']
+    split_list = ['test']
+    # stratification_type_list = ['de', 'fr']
+    stratification_type_list = ['de', 'fr', 'ru', 'en']
     # stratification_type_list = ['forum post', 'review']
     for split in split_list:
         for stratify_by in stratification_type_list:
@@ -105,13 +130,16 @@ if __name__ == '__main__':
             with open(os.path.join(stratified_source_path, f'{split}_language_{stratify_by}.json'), 'r') as f:
                 full_json.update(json.load(f))
 
+    # with open(os.path.join(source_path, 'no_mappings_unique.csv'), 'r') as f:
+    #     full_dataset = [s.strip() for s in f.readlines()]
     with open(os.path.join(dataset_path, 'source.json'), 'w') as f:
         json.dump(full_json, f)
 
-    print(len(full_json))
     with open(os.path.join(dataset_path, 'source.json')) as f:
         full_dataset = json.load(f)
 
+    print(len(full_dataset))
+    # exit()
     with open(os.path.join(source_path, 'drug_classification.json')) as f:
         drug_classification = json.load(f)
 
@@ -137,20 +165,24 @@ if __name__ == '__main__':
         tweet_drug_map = json.load(f)
 
     i = 0
+    total_input_tokens = 0
     with open(os.path.join(dataset_path, 'payload.jsonl'), 'w') as f:
         for tweet_id, text in tqdm(list(full_dataset.items())):
-        # for tweet_id, drug_name in tqdm(enumerate(full_dataset)):
+        # for tweet_id, text in tqdm(enumerate(full_dataset)):
             context = ''
             drug_to_skip = []
             drug_interactions = []
 
             for drug_name in tweet_drug_map[tweet_id]:
                 drug_name = drug_name.lower()
-                if not len(drug_description[drug_name]) and not len(drug_classification[drug_name]):
-                    continue
+                # if not len(drug_description[drug_name]) and not len(drug_classification[drug_name]):
+                #     continue
                 i += 1
 
-                context = f'Drug: {drug_name}\n\nDescription:\n{drug_description[drug_name]}\n\nClassification:\n{drug_classification[drug_name]}\n\n'
+                # context = f'Drug: {drug_name}\n\nDescription:\n{drug_description[drug_name]}\n\nClassification:\n{drug_classification[drug_name]}\n\n'
+                if len(context):
+                    context += '\n---\n\n'
+                context += f'Drug: {drug_name}\n\n'
                 if indication[drug_name]:
                     context += f'Indication:\n{indication[drug_name]}\n\n'
 
@@ -163,21 +195,25 @@ if __name__ == '__main__':
                 if toxicity[drug_name]:
                     context += f'Toxicity:\n{toxicity[drug_name]}\n\n'
 
-                if not len(known_interaction_description[drug_name]) or drug_name in drug_to_skip:
-                    continue
+                # if not len(known_interaction_description[drug_name]) or drug_name in drug_to_skip:
+                #     continue
 
-                for drug_to_check in tweet_drug_map[tweet_id]:
-                    if drug_to_check == drug_name or drug_to_check not in known_interaction_description[drug_name]:
-                        continue
+                # for drug_to_check in tweet_drug_map[tweet_id]:
+                #     if drug_to_check == drug_name or drug_to_check not in known_interaction_description[drug_name]:
+                #         continue
+                #
+                #     drug_interactions.append(known_interaction_description[drug_name][drug_to_check])
+                #     drug_to_skip.append(drug_to_check)
 
-                    drug_interactions.append(known_interaction_description[drug_name][drug_to_check])
-                    drug_to_skip.append(drug_to_check)
-
-            if len(drug_interactions):
-                context += f'\nInteractions:\n{"\n".join(drug_interactions)}\n\n'
+            # if len(drug_interactions):
+            #     context += f'\nInteractions:\n{"\n".join(drug_interactions)}\n\n'
 
             if not len(context):
                 context = 'No context'
+            content = ade_mining_advanced_prompt.format(context=context, text=text)
+            # content = ru_drug_name_translate.format(text=text)
+
+            total_input_tokens += len(encoder.encode(content))
 
             json.dump({"custom_id": tweet_id, "method": "POST", "url": "/v1/chat/completions",
                        "body": {
@@ -187,10 +223,10 @@ if __name__ == '__main__':
                            "messages": [
                                {
                                    "role": "user",
-                                   "content": paraphrase_advanced_prompt.format(context=context, text=text)
+                                   "content": content
                                }
                            ],
-                           "max_tokens": 300,
+                           "max_tokens": 100,
                            "temperature": 0,
                            "top_p": 1,
                            "frequency_penalty": 0,
@@ -198,6 +234,7 @@ if __name__ == '__main__':
             f.write('\n')
 
     print(len(full_dataset), len(set(full_dataset)), i)
+    print('Total input tokens: ', total_input_tokens)
     # exit()
     client = openai.OpenAI()
 
@@ -212,7 +249,7 @@ if __name__ == '__main__':
         endpoint="/v1/chat/completions",
         completion_window="24h",
         metadata={
-            "description": "Paraphrase advanced"
+            "description": "Test data ade mining"
         }
     )
 

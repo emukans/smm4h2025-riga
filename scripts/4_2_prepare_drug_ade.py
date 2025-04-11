@@ -8,7 +8,7 @@ from tqdm import tqdm
 if __name__ == '__main__':
     data_dir = '../data/task1'
 
-    with open(os.path.join(data_dir, 'drug_list.json'), 'r') as f:
+    with open(os.path.join(data_dir, 'test_drug_list.json'), 'r') as f:
         drug_list = json.load(f)
 
     # tree = ET.parse('../data/task1/drug.xml')

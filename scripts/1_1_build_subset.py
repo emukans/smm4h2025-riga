@@ -15,7 +15,8 @@ def select_by_field(df, field_type, field_value):
 
 
 if __name__ == "__main__":
-    split_list = ["train", "dev"]
+    # split_list = ["train", "dev"]
+    split_list = ["test"]
     os.makedirs('../data/task1/stratified', exist_ok=True)
 
     for split in split_list:

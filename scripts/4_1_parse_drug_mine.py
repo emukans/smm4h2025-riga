@@ -15,7 +15,7 @@ def build_map(augmentation_type):
     with open(os.path.join(data_dir, 'full_name_map.json')) as f:
         drug_map = json.load(f)
 
-    with open(os.path.join(data_dir, 'ru_drug_map.json')) as f:
+    with open(os.path.join(data_dir, 'ru_drug_map2.json')) as f:
         ru_drug_map = json.load(f)
 
     with open(os.path.join(data_dir, 'unmapped_drug_map.json')) as f:
@@ -24,7 +24,7 @@ def build_map(augmentation_type):
     with open(os.path.join(data_dir, 'drug_description.json')) as f:
         drug_description_map = json.load(f)
 
-    augmentation_path = os.path.join(data_dir, f'stratified/{augmentation_type}/augmentation_result.jsonl')
+    augmentation_path = os.path.join(data_dir, f'test_stratified/{augmentation_type}/augmentation_result.jsonl')
     drug_mining_map = {}
     drug_mining_map_with_description = {}
     augmentation_map = set()
@@ -116,10 +116,10 @@ def build_map(augmentation_type):
     with open(os.path.join(data_dir, 'ru_no_mappings_unique.csv'), 'w') as f:
         f.writelines([l + '\n' for l in ru_no_mappings])
 
-    with open(os.path.join(data_dir, f'stratified/{augmentation_type}/processed_description.json'), 'w') as f:
+    with open(os.path.join(data_dir, f'test_stratified/{augmentation_type}/processed_description.json'), 'w') as f:
         json.dump(drug_mining_map_with_description, f)
 
-    with open(os.path.join(data_dir, f'stratified/{augmentation_type}/processed.json'), 'w') as f:
+    with open(os.path.join(data_dir, f'test_stratified/{augmentation_type}/processed.json'), 'w') as f:
         json.dump(drug_mining_map, f)
 
     return augmentation_map
@@ -128,12 +128,12 @@ def build_map(augmentation_type):
 if __name__ == '__main__':
     data_dir = '../data/task1'
 
-    test_df = pd.read_csv(os.path.join(data_dir, 'dev_preprocessed.csv'))
-    train_df = pd.read_csv(os.path.join(data_dir, 'train_preprocessed.csv'))
+    # test_df = pd.read_csv(os.path.join(data_dir, 'dev_preprocessed.csv'))
+    # train_df = pd.read_csv(os.path.join(data_dir, 'train_preprocessed.csv'))
 
     augmentation_type = 'drug_mining2'
 
     drug_set = build_map(augmentation_type)
     print(len(drug_set))
-    with open(os.path.join(data_dir, 'drug_list.json'), 'w') as f:
+    with open(os.path.join(data_dir, 'test_drug_list.json'), 'w') as f:
         json.dump(list(drug_set), f, ensure_ascii=False)
